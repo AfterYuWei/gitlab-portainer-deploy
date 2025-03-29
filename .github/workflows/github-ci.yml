@@ -3,31 +3,24 @@ name: Build and Push Docker Image to Docker Hub
 on:
   push:
     branches:
-      - main  # 你可以根据需求设置触发的分支
+      - main
   pull_request:
     branches:
-      - main  # 也可以设置对某个分支的 PR 触发构建
+      - main
 
 jobs:
   build_and_push:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout repository
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Login to DockerHub
+      - name: Push to DockerHub
         uses: docker/login-action@v1
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      # Step 3: Build Docker image
-      - name: Build Docker image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/gitlab-portainer-deploy:latest .
-
-      # Step 4: Push Docker image to Docker Hub
-      - name: Push Docker image
-        run: |
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/gitlab-portainer-deploy:latest
