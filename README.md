@@ -9,12 +9,7 @@ deploy:
   stage: deploy
   image: yuwei1228/gitlab-portainer-deploy
   script:
-    - python /app/deploy.py \
-        --URL "$PORTAINER_URL" \
-        --USERNAME "$PORTAINER_USERNAME" \
-        --PASSWORD "$PORTAINER_PASSWORD" \
-        --STACK "$PORTAINER_STACK" \
-        --ENDPOINT "$PORTAINER_ENDPOINT"
+    - python /app/deploy.py --URL "$PORTAINER_URL" --USERNAME "$PORTAINER_USERNAME" --PASSWORD "$PORTAINER_PASSWORD" --STACK "$PORTAINER_STACK" --ENDPOINT "$PORTAINER_ENDPOINT"
   tags:
     - docker
 ```
