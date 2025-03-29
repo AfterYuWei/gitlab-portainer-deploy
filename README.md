@@ -7,7 +7,7 @@ stages:
 
 deploy:
   stage: deploy
-  image: xxx/gitlab-portainer-deploy
+  image: yuwei1228/gitlab-portainer-deploy
   script:
     - python /app/deploy.py \
         --URL "$PORTAINER_URL" \
