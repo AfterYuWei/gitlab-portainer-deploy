@@ -115,7 +115,7 @@ def update_stack(url, jwt, stack_id, stack_file_content, endpoint_id):
 import time
 
 
-def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
+def check_container_health(url, jwt, endpoint_id, stack_name, timeout=3000):
     headers = {
         "Authorization": f"Bearer {jwt}"
     }
@@ -184,7 +184,7 @@ if __name__ == '__main__':
 
     # 提交更新
     UpdateDate = update_stack(args.URL, jwt_token, stack_id, updated_stack_file, args.ENDPOINT)
-    print("⏳ Start Update, Time: " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(UpdateDate['UpdateDate'])))
+    print(f"⏳ Start Update, Update Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(UpdateDate['UpdateDate']))}, Update By: {UpdateDate['UpdatedBy']}")
 
     # 检查健康状态
     if not check_container_health(args.URL, jwt_token, args.ENDPOINT, args.STACK):
