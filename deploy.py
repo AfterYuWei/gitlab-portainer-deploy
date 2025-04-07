@@ -1,8 +1,5 @@
 import argparse
-from datetime import datetime, timedelta
 import json
-
-import pytz
 import requests
 import yaml
 
@@ -187,10 +184,10 @@ if __name__ == '__main__':
 
     # 提交更新
     UpdateDate = update_stack(args.URL, jwt_token, stack_id, updated_stack_file, args.ENDPOINT)
-    print("Start Update")
+    print("⏳ Start Update, Time: " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(UpdateDate['UpdateDate'])))
 
     # 检查健康状态
     if not check_container_health(args.URL, jwt_token, args.ENDPOINT, args.STACK):
-        raise Exception("❌ 更新失败：容器未全部通过健康检查")
+        raise Exception("❌ Update failed: All containers did not pass health checks")
 
-    print("🎉 更新完成, 完成时间:", (datetime.fromtimestamp(UpdateDate['UpdateDate'], tz=pytz.UTC) + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S'))
+    print("🎉 Update Success, Time : " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()))
