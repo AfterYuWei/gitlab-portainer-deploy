@@ -170,19 +170,32 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
             if health_status == 'starting':
                 any_starting = True
             elif health_status == 'unhealthy':
+                print(f"检测到容器 {container_id} unhealthy，打印最近 200 行日志：")
+                # 拉取日志
+                log_params = {
+                    "stdout": True,
+                    "stderr": True,
+                    "tail": 200
+                }
+                logs_resp = requests.get(
+                    f"{url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/logs",
+                    headers=headers,
+                    params=log_params
+                )
+                if logs_resp.status_code == 200:
+                    print(logs_resp.text)
+                else:
+                    print(f"获取日志失败，状态码：{logs_resp.status_code}")
                 any_unhealthy = True
             elif health_status == 'healthy':
                 continue
             else:
-                print(f"容器 {container_id} 出现未知健康状态 {health_status}，视为失败")
                 return False
 
         if any_unhealthy:
-            print("检测到有容器 unhealthy，立即失败 ❌")
             return False
 
         if any_starting:
-            print("有容器正在 starting，等待5秒后重试 ⏳")
             time.sleep(5)
             continue
 
