@@ -128,7 +128,8 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
         response = requests.get(
             f"{url}/api/endpoints/{endpoint_id}/docker/containers/json",
             headers=headers,
-            params={"filters": filters}
+            params={"filters": filters,
+                    "all": True}
         )
 
         if response.status_code != 200:
