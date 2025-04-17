@@ -167,12 +167,14 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
                 continue
 
             health_status = health.get('Status')
+            print(f"容器 {container_id} 健康状态：{health_status}")
+
             if health_status == 'starting':
-                print(f"容器 {container_id} 健康状态：{health_status}")
                 all_healthy = False
             if health_status == 'unhealthy':
-                print(f"容器 {container_id} 健康状态：{health_status}")
                 return False
+            if health_status == 'healthy':
+                all_healthy = True
 
         if all_healthy:
             print("所有容器均健康")
