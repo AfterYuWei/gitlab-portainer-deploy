@@ -164,6 +164,7 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
                 return False
 
             health_status = health.get('Status')
+            print(f"容器 {container_id} 健康状态：{health_status}")
 
             if health_status == 'starting':
                 any_starting = True
@@ -172,18 +173,21 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
             elif health_status == 'healthy':
                 continue
             else:
-                print(f"容器 {container_id} 出现未知健康状态 {health_status}")
+                print(f"容器 {container_id} 出现未知健康状态 {health_status}，视为失败")
                 return False
 
         if any_unhealthy:
+            print("检测到有容器 unhealthy，立即失败 ❌")
             return False
 
         if any_starting:
+            print("有容器正在 starting，等待5秒后重试 ⏳")
             time.sleep(5)
             continue
 
         return True
 
+    print("超时，容器未全部通过健康检查 ❌")
     return False
 
 
