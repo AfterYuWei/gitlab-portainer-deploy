@@ -125,7 +125,6 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
     deadline = time.time() + timeout
 
     while time.time() < deadline:
-        # 获取容器列表
         response = requests.get(
             f"{url}/api/endpoints/{endpoint_id}/docker/containers/json",
             headers=headers,
@@ -142,12 +141,12 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
             print("没有找到相关容器，检查是否正确启动")
             return False
 
-        all_healthy = True
+        any_starting = False
+        any_unhealthy = False
 
         for container in containers:
             container_id = container.get('Id')
 
-            # 获取单个容器详细信息
             detail_resp = requests.get(
                 f"{url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/json",
                 headers=headers
@@ -155,34 +154,36 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
 
             if detail_resp.status_code != 200:
                 print(f"获取容器详情失败，容器ID: {container_id}")
-                all_healthy = False
-                continue
+                return False
 
             detail = detail_resp.json()
             health = detail.get('State', {}).get('Health')
 
             if not health:
                 print(f"容器 {container_id} 没有健康检查配置")
-                all_healthy = False
-                continue
+                return False
 
             health_status = health.get('Status')
-            print(f"容器 {container_id} 健康状态：{health_status}")
 
             if health_status == 'starting':
-                all_healthy = False
-            if health_status == 'unhealthy':
+                any_starting = True
+            elif health_status == 'unhealthy':
+                any_unhealthy = True
+            elif health_status == 'healthy':
+                continue
+            else:
+                print(f"容器 {container_id} 出现未知健康状态 {health_status}")
                 return False
-            if health_status == 'healthy':
-                all_healthy = True
 
-        if all_healthy:
-            print("所有容器均健康")
-            return True
-        else:
-            time.sleep(5)  # 每次循环等待5秒再重试
+        if any_unhealthy:
+            return False
 
-    print("超时，容器未全部通过健康检查")
+        if any_starting:
+            time.sleep(5)
+            continue
+
+        return True
+
     return False
 
 
