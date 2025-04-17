@@ -234,6 +234,8 @@ if __name__ == '__main__':
         # 健康检查失败时回滚
         UpdateDate = update_stack(args.URL, jwt_token, stack_id, stack_file, args.ENDPOINT)
         print(f"⏳ Start Rollback, Rollback Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(UpdateDate['UpdateDate']))}, Rollback By: {UpdateDate['UpdatedBy']}")
+        if not check_container_health(args.URL, jwt_token, args.ENDPOINT, args.STACK):
+            print("❌ Rollback failed")
         raise Exception("❌ Update failed: All containers did not pass health checks, rollback completed.")
 
     print("🎉 Update Success, Time : " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()))
