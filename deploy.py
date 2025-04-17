@@ -115,7 +115,7 @@ def update_stack(url, jwt, stack_id, stack_file_content, endpoint_id):
 import time
 
 
-def check_container_health(url, jwt, endpoint_id, stack_name, timeout=3000):
+def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
     headers = {
         "Authorization": f"Bearer {jwt}"
     }
@@ -125,6 +125,7 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=3000):
     deadline = time.time() + timeout
 
     while time.time() < deadline:
+        # 获取容器列表
         response = requests.get(
             f"{url}/api/endpoints/{endpoint_id}/docker/containers/json",
             headers=headers,
@@ -143,17 +144,35 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=3000):
 
         all_healthy = True
 
-        # 检查每个容器的健康状态
         for container in containers:
             container_id = container.get('Id')
-            status = container.get('Status', '')
 
-            # 检查 Status 是否包含 "(healthy)"
-            if '(healthy)' not in status:
+            # 获取单个容器详细信息
+            detail_resp = requests.get(
+                f"{url}/api/endpoints/{endpoint_id}/docker/containers/{container_id}/json",
+                headers=headers
+            )
+
+            if detail_resp.status_code != 200:
+                print(f"获取容器详情失败，容器ID: {container_id}")
+                all_healthy = False
+                continue
+
+            detail = detail_resp.json()
+            health = detail.get('State', {}).get('Health')
+
+            if not health:
+                print(f"容器 {container_id} 没有健康检查配置")
+                all_healthy = False
+                continue
+
+            health_status = health.get('Status')
+            if health_status != 'healthy':
+                print(f"容器 {container_id} 健康状态：{health_status}")
                 all_healthy = False
 
-        # 如果所有容器都健康，返回True
         if all_healthy:
+            print("所有容器均健康")
             return True
 
         time.sleep(5)  # 每次循环等待5秒再重试
