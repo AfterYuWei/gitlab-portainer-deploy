@@ -49,7 +49,7 @@ def get_stack_id(url, jwt, stack_name):
     return None
 
 
-def get_stack_file(url, stack_id, jwt_token, image_tag="latest"):
+def get_stack_file(url, stack_id, jwt_token):
     # 构造请求头，包含 Bearer token
     headers = {
         "Authorization": f"Bearer {jwt_token}"
@@ -62,28 +62,7 @@ def get_stack_file(url, stack_id, jwt_token, image_tag="latest"):
     response.raise_for_status()
 
     # 解析返回的 JSON 响应
-    stack_file_content = response.json().get('StackFileContent')
-
-    # 如果没有内容或不是 YAML，直接返回
-    if not stack_file_content:
-        return stack_file_content
-
-    # 修改镜像标签
-    try:
-        stack_config = yaml.safe_load(stack_file_content)
-        for service_config in stack_config.get('services', {}).values():
-            if 'image' in service_config:
-                image_full = service_config['image']
-                # 使用 rsplit 防止替换掉端口号
-                if ':' in image_full:
-                    image_name, _ = image_full.rsplit(':', 1)
-                else:
-                    image_name = image_full
-                service_config['image'] = f"{image_name}:{image_tag}"
-        return yaml.dump(stack_config)
-    except Exception as e:
-        print(f"修改镜像标签失败: {e}")
-        return stack_file_content  # 出错时返回原始内容
+    return response.json().get('StackFileContent')
 
 
 def update_stack(url, jwt, stack_id, stack_file_content, endpoint_id):
@@ -165,7 +144,6 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
                 return False
 
             health_status = health.get('Status')
-            print(f"容器 {container_id} 健康状态：{health_status}")
 
             if health_status == 'starting':
                 any_starting = True
@@ -205,6 +183,25 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
     return False
 
 
+def modify_stack_file(updated_stack_file, IMAGE_TAG="latest"):
+    # 修改镜像标签
+    try:
+        stack_config = yaml.safe_load(updated_stack_file)
+        for service_config in stack_config.get('services', {}).values():
+            if 'image' in service_config:
+                image_full = service_config['image']
+                # 使用 rsplit 防止替换掉端口号
+                if ':' in image_full:
+                    image_name, _ = image_full.rsplit(':', 1)
+                else:
+                    image_name = image_full
+                service_config['image'] = f"{image_name}:{IMAGE_TAG}"
+        return yaml.dump(stack_config)
+    except Exception as e:
+        print(f"修改镜像标签失败: {e}")
+        return updated_stack_file  # 出错时返回原始内容
+
+
 if __name__ == '__main__':
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser()
@@ -222,8 +219,11 @@ if __name__ == '__main__':
     # 获取 stack_id
     stack_id = get_stack_id(args.URL, jwt_token, args.STACK)
 
-    # 获取并自动修改 Stack 文件
-    updated_stack_file = get_stack_file(args.URL, stack_id, jwt_token, args.IMAGE_TAG)
+    # 获取当前 Stack 文件
+    stack_file = get_stack_file(args.URL, stack_id, jwt_token)
+
+    # 修改 Stack 文件
+    updated_stack_file = modify_stack_file(stack_file, args.IMAGE_TAG)
 
     # 提交更新
     UpdateDate = update_stack(args.URL, jwt_token, stack_id, updated_stack_file, args.ENDPOINT)
@@ -231,6 +231,9 @@ if __name__ == '__main__':
 
     # 检查健康状态
     if not check_container_health(args.URL, jwt_token, args.ENDPOINT, args.STACK):
-        raise Exception("❌ Update failed: All containers did not pass health checks")
+        # 健康检查失败时回滚
+        UpdateDate = update_stack(args.URL, jwt_token, stack_id, stack_file, args.ENDPOINT)
+        print(f"⏳ Start Rollback, Rollback Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(UpdateDate['UpdateDate']))}, Rollback By: {UpdateDate['UpdatedBy']}")
+        raise Exception("❌ Update failed: All containers did not pass health checks, rollback completed.")
 
     print("🎉 Update Success, Time : " + time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()))
