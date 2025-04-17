@@ -174,8 +174,8 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
         if all_healthy:
             print("所有容器均健康")
             return True
-
-        time.sleep(5)  # 每次循环等待5秒再重试
+        else:
+            time.sleep(5)  # 每次循环等待5秒再重试
 
     print("超时，容器未全部通过健康检查")
     return False
