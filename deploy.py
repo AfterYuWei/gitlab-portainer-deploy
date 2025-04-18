@@ -210,4 +210,4 @@ if __name__ == '__main__':
         success("rollback completed.")
         raise Exception("❌ Update failed")
 
-    success(f"✅ Update Success, Time : {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
+    success(f"Update Success, Time : {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
