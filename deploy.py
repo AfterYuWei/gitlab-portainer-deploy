@@ -123,6 +123,7 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
                 )
                 if logs_resp.status_code == 200:
                     print(logs_resp.text)
+                    print("\033[34m📋 Please check the logs.\033[0m")
                 else:
                     print(f"\033[31m❌ 获取日志失败，状态码：{logs_resp.status_code}\033[0m")
                 any_unhealthy = True
