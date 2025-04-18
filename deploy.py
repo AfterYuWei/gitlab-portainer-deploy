@@ -134,7 +134,8 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
                     params=log_params
                 )
                 if logs_resp.status_code == 200:
-                    info(logs_resp.text)
+                    print(logs_resp.text)
+                    info("Please check the logs.")
                 else:
                     error(f"获取日志失败，状态码：{logs_resp.status_code}")
                 any_unhealthy = True
