@@ -5,6 +5,18 @@ import yaml
 import time
 
 
+def info(message):
+    print(f"\033[34m📋 {message}\033[0m")
+
+
+def warn(message):
+    print(f"\033[33m⚠️ {message}\033[0m")
+
+
+def error(message):
+    print(f"\033[31m❌ {message}\033[0m")
+
+
 def login(url, username, password):
     data = {
         "username": username,
@@ -74,13 +86,13 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
         )
 
         if response.status_code != 200:
-            print(f"\033[31m❌ 请求失败，状态码：{response.status_code}\033[0m")
+            error(f"请求失败，状态码：{response.status_code}")
             return False
 
         containers = response.json()
 
         if not containers:
-            print("\033[31m❌ 没有找到相关容器，检查是否正确启动\033[0m")
+            error("没有找到相关容器，检查是否正确启动")
             return False
 
         any_starting = False
@@ -95,14 +107,14 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
             )
 
             if detail_resp.status_code != 200:
-                print(f"\033[31m❌ 获取容器详情失败，容器ID: {container_id}\033[0m")
+                error(f"获取容器详情失败，容器ID: {container_id}")
                 return False
 
             detail = detail_resp.json()
             health = detail.get('State', {}).get('Health')
 
             if not health:
-                print(f"\033[33m⚠️ 容器 {container_id} 没有健康检查配置\033[0m")
+                warn(f"容器 {container_id} 没有健康检查配置")
                 return False
 
             health_status = health.get('Status')
@@ -110,7 +122,7 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
             if health_status == 'starting':
                 any_starting = True
             elif health_status == 'unhealthy':
-                print(f"\033[31m❌ 检测到容器 {container_id} unhealthy，打印最近 200 行日志：\033[0m")
+                error(f"检测到容器 {container_id} unhealthy，打印最近 200 行日志：")
                 log_params = {
                     "stdout": True,
                     "stderr": True,
@@ -122,15 +134,14 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
                     params=log_params
                 )
                 if logs_resp.status_code == 200:
-                    print(logs_resp.text)
-                    print("\033[34m📋 Please check the logs.\033[0m")
+                    info(logs_resp.text)
                 else:
-                    print(f"\033[31m❌ 获取日志失败，状态码：{logs_resp.status_code}\033[0m")
+                    error(f"获取日志失败，状态码：{logs_resp.status_code}")
                 any_unhealthy = True
             elif health_status == 'healthy':
                 continue
             else:
-                print(f"\033[31m❌ 未知健康状态: {health_status}\033[0m")
+                error(f"未知健康状态: {health_status}")
                 return False
 
         if any_unhealthy:
@@ -142,7 +153,7 @@ def check_container_health(url, jwt, endpoint_id, stack_name, timeout=300):
 
         return True
 
-    print(f"\033[31m❌ 超时，容器未全部通过健康检查\033[0m")
+    error("超时，容器未全部通过健康检查")
     return False
 
 
@@ -159,7 +170,7 @@ def modify_stack_file(updated_stack_file, IMAGE_TAG="latest"):
                 service_config['image'] = f"{image_name}:{IMAGE_TAG}"
         return yaml.dump(stack_config)
     except Exception as e:
-        print(f"\033[31m❌ 修改镜像标签失败: {e}\033[0m")
+        error(f"修改镜像标签失败: {e}")
         return updated_stack_file
 
 
@@ -182,14 +193,14 @@ if __name__ == '__main__':
     updated_stack_file = modify_stack_file(stack_file, args.IMAGE_TAG)
 
     UpdateDate = update_stack(args.URL, jwt_token, stack_id, updated_stack_file, args.ENDPOINT)
-    print(f"\033[34m⏳ Start Update, Update Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(UpdateDate['UpdateDate']))}, Update By: {UpdateDate['UpdatedBy']}\033[0m")
+    print(f"⏳ Start Update, Update Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(UpdateDate['UpdateDate']))}, Update By: {UpdateDate['UpdatedBy']}")
 
     if not check_container_health(args.URL, jwt_token, args.ENDPOINT, args.STACK):
         UpdateDate = update_stack(args.URL, jwt_token, stack_id, stack_file, args.ENDPOINT)
-        print("\033[31m❌ Update failed: Containers did not pass health checks, start rollback.\033[0m")
-        print(f"\033[33m🔄 Start Rollback, Rollback Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(UpdateDate['UpdateDate']))}, Rollback By: {UpdateDate['UpdatedBy']}\033[0m")
+        error("Update failed: Containers did not pass health checks, start rollback.")
+        print(f"🔄 Start Rollback, Rollback Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(UpdateDate['UpdateDate']))}, Rollback By: {UpdateDate['UpdatedBy']}")
         if not check_container_health(args.URL, jwt_token, args.ENDPOINT, args.STACK):
-            raise Exception("\033[31m❌ Rollback failed\033[0m")
+            raise Exception("❌ Rollback failed")
         raise Exception("✅ rollback completed.")
 
-    print(f"\033[32m✅ Update Success, Time : {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}\033[0m")
+    info(f"✅ Update Success, Time : {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
