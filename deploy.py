@@ -17,6 +17,10 @@ def error(message):
     print(f"\033[31m❌ {message}\033[0m")
 
 
+def success(message):
+    print(f"\033[32m✅ {message}\033[0m")
+
+
 def login(url, username, password):
     data = {
         "username": username,
@@ -200,9 +204,10 @@ if __name__ == '__main__':
         UpdateDate = update_stack(args.URL, jwt_token, stack_id, stack_file, args.ENDPOINT)
         error("Update failed: Containers did not pass health checks, start rollback.")
         print(f"🔄 Start Rollback, Rollback Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(UpdateDate['UpdateDate']))}, Rollback By: {UpdateDate['UpdatedBy']}")
+
         if not check_container_health(args.URL, jwt_token, args.ENDPOINT, args.STACK):
             raise Exception("❌ Rollback failed")
-        print("✅ rollback completed.")
+        success("rollback completed.")
         raise Exception("Update failed")
 
-    info(f"✅ Update Success, Time : {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
+    success(f"✅ Update Success, Time : {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
