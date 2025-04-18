@@ -208,6 +208,6 @@ if __name__ == '__main__':
         if not check_container_health(args.URL, jwt_token, args.ENDPOINT, args.STACK):
             raise Exception("❌ Rollback failed")
         success("rollback completed.")
-        raise Exception("Update failed")
+        raise Exception("❌ Update failed")
 
     success(f"✅ Update Success, Time : {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
