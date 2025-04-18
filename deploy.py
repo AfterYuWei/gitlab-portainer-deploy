@@ -202,6 +202,7 @@ if __name__ == '__main__':
         print(f"🔄 Start Rollback, Rollback Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(UpdateDate['UpdateDate']))}, Rollback By: {UpdateDate['UpdatedBy']}")
         if not check_container_health(args.URL, jwt_token, args.ENDPOINT, args.STACK):
             raise Exception("❌ Rollback failed")
-        raise Exception("✅ rollback completed.")
+        print("✅ rollback completed.")
+        raise Exception("Update failed")
 
     info(f"✅ Update Success, Time : {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
