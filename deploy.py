@@ -2,6 +2,7 @@ import argparse
 import requests
 import yaml
 import sys
+import time
 
 class PortainerUpdater:
     def __init__(self, base_url, username, password):
@@ -57,6 +58,31 @@ class PortainerUpdater:
                            json=payload)
         return res
 
+    def is_service_healthy(self, env_id, service_name):
+        print("[INFO] 等待服务容器健康检查通过...")
+        for _ in range(30):
+            res = requests.get(f"{self.base_url}/api/endpoints/{env_id}/docker/containers/json", headers=self.headers)
+            res.raise_for_status()
+            containers = res.json()
+            for container in containers:
+                names = container.get("Names", [])
+                if any(service_name in name for name in names):
+                    container_id = container.get("Id")
+                    detail_res = requests.get(
+                        f"{self.base_url}/api/endpoints/{env_id}/docker/containers/{container_id}/json",
+                        headers=self.headers)
+                    detail_res.raise_for_status()
+                    detail = detail_res.json()
+                    health = detail.get("State", {}).get("Health", {}).get("Status")
+                    if health == "healthy":
+                        print(f"[INFO] 容器 {service_name} 状态: healthy")
+                        return True
+                    else:
+                        print(
+                            f"[INFO] 当前状态: {health if health else detail.get('State', {}).get('Status', 'unknown')}")
+            time.sleep(3)
+        return False
+
     def deploy(self, env_name, stack_name, service, new_image, rollback=False):
         self.login()
         env_id = self.get_environment_id(env_name)
@@ -76,7 +102,17 @@ class PortainerUpdater:
         res = self.update_stack(stack_id, env_id, updated_yaml_content, stack.get('Env', []))
 
         if res.status_code == 200:
-            print("[INFO] 部署成功")
+            if self.is_service_healthy(env_id, service):
+                print("[INFO] 部署成功并健康")
+            else:
+                print("[ERROR] 容器未变为 healthy")
+                if rollback:
+                    print("[INFO] 开始回滚...")
+                    rollback_res = self.update_stack(stack_id, env_id, orig_stack_file, stack.get('Env', []))
+                    if rollback_res.status_code == 200:
+                        print("[INFO] 回滚成功")
+                    else:
+                        print(f"[ERROR] 回滚失败: {rollback_res.status_code} {rollback_res.text}")
         else:
             print(f"[ERROR] 部署失败: {res.status_code} {res.text}")
             if rollback:
