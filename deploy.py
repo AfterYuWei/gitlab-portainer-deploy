@@ -58,9 +58,10 @@ class PortainerUpdater:
                            json=payload)
         return res
 
-    def is_service_healthy(self, env_id, service_name):
+    def is_service_healthy(self, env_id, service_name, timeout=300):
         print("[INFO] 等待服务容器健康检查通过...")
-        for _ in range(30):
+        attempts = timeout // 3
+        for _ in range(attempts):
             res = requests.get(f"{self.base_url}/api/endpoints/{env_id}/docker/containers/json", headers=self.headers)
             res.raise_for_status()
             containers = res.json()
@@ -68,22 +69,21 @@ class PortainerUpdater:
                 names = container.get("Names", [])
                 if any(service_name in name for name in names):
                     container_id = container.get("Id")
-                    detail_res = requests.get(
-                        f"{self.base_url}/api/endpoints/{env_id}/docker/containers/{container_id}/json",
-                        headers=self.headers)
+                    detail_res = requests.get(f"{self.base_url}/api/endpoints/{env_id}/docker/containers/{container_id}/json", headers=self.headers)
                     detail_res.raise_for_status()
                     detail = detail_res.json()
                     health = detail.get("State", {}).get("Health", {}).get("Status")
+                    cname = detail.get("Name", "<unknown>").lstrip("/")
+                    status = health if health else detail.get("State", {}).get("Status", "unknown")
+                    print(f"[INFO] 容器 {cname} 当前状态: {status}")
                     if health == "healthy":
-                        print(f"[INFO] 容器 {service_name} 状态: healthy")
                         return True
-                    else:
-                        print(
-                            f"[INFO] 当前状态: {health if health else detail.get('State', {}).get('Status', 'unknown')}")
+                    elif health == "unhealthy":
+                        return False
             time.sleep(3)
         return False
 
-    def deploy(self, env_name, stack_name, service, new_image, rollback=False):
+    def deploy(self, env_name, stack_name, service, new_image, rollback=False, timeout=300):
         self.login()
         env_id = self.get_environment_id(env_name)
         stack = self.get_stack_info(stack_name, env_id)
@@ -102,10 +102,11 @@ class PortainerUpdater:
         res = self.update_stack(stack_id, env_id, updated_yaml_content, stack.get('Env', []))
 
         if res.status_code == 200:
-            if self.is_service_healthy(env_id, service):
+            healthy = self.is_service_healthy(env_id, service, timeout=timeout)
+            if healthy:
                 print("[INFO] 部署成功并健康")
             else:
-                print("[ERROR] 容器未变为 healthy")
+                print("[ERROR] 容器未变为 healthy，视为失败")
                 if rollback:
                     print("[INFO] 开始回滚...")
                     rollback_res = self.update_stack(stack_id, env_id, orig_stack_file, stack.get('Env', []))
@@ -123,7 +124,6 @@ class PortainerUpdater:
                 else:
                     print(f"[ERROR] 回滚失败: {rollback_res.status_code} {rollback_res.text}")
 
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--URL', required=True)
@@ -134,6 +134,7 @@ def main():
     parser.add_argument('--SERVICE', required=True)
     parser.add_argument('--IMAGE', required=True)
     parser.add_argument('--ROLLBACK', action='store_true')
+    parser.add_argument('--TIMEOUT', type=int, default=300, help='健康检查等待时间，单位秒')
     args = parser.parse_args()
 
     updater = PortainerUpdater(args.URL, args.USERNAME, args.PASSWORD)
@@ -142,7 +143,8 @@ def main():
         stack_name=args.STACK,
         service=args.SERVICE,
         new_image=args.IMAGE,
-        rollback=args.ROLLBACK
+        rollback=args.ROLLBACK,
+        timeout=args.TIMEOUT
     )
 
 
