@@ -1,100 +1,81 @@
 
-# 自用 Portainer 部署脚本
+# Portainer Stack 自动部署工具
 
-该脚本旨在通过 Portainer 自动化部署 Stack，使用 Docker Compose 部署的 stack 会自动根据创建的文件进行部署。只需根据配置文件中的参数信息，脚本会自动根据 Stack 名称获取对应的 Stack ID 并完成更新操作。
+该工具用于通过 Portainer API 自动更新指定堆栈中的服务镜像，并支持部署失败后的自动回滚。适用于 GitLab CI/CD 自动化部署场景，已内置健康检查机制，确保服务稳定后才认为部署成功。
 
-## 配置说明
+---
 
-### 环境变量
+## 📦 使用方式
 
-在运行部署脚本之前，需要配置以下环境变量：
+通过命令行运行 `deploy.py`，或在 GitLab CI 的 `deploy` 阶段中集成该工具。
 
-- `PORTAINER_URL`：Portainer 实例的 URL 地址。
-- `PORTAINER_USERNAME`：登录 Portainer 的用户名。
-- `PORTAINER_PASSWORD`：登录 Portainer 的密码。
-- `PORTAINER_STACK`：要部署的 Stack 名称。
-- `PORTAINER_ENDPOINT`：指定 Portainer 的 endpoint，用于获取相关的 stack 列表和信息。
-- `IMAGE_TAG`：可选，指定要更新的镜像标签，默认为 `latest`。
+### 命令行参数
 
-### 运行脚本
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `--URL` | ✅ | Portainer 面板地址，例如 `http://portainer.local:9000` |
+| `--USERNAME` | ✅ | 登录 Portainer 的用户名 |
+| `--PASSWORD` | ✅ | 登录 Portainer 的密码 |
+| `--ENVIRONMENT` | ✅ | Portainer 中的环境名称（非 ID） |
+| `--STACK` | ✅ | 堆栈（Stack）名称 |
+| `--SERVICE` | ✅ | 要更新的服务名（服务名必须在 docker-compose.yml 的 services 中定义） |
+| `--IMAGE` | ✅ | 要更新为的镜像名（**强烈建议包含 tag，例如 `api:1.0.1`**） |
+| `--ROLLBACK` | 可选 | 如果部署失败则自动回滚 |
+| `--TIMEOUT` | 可选 | 健康检查的最长等待时间，默认 300 秒 |
 
-1. 克隆或下载本仓库中的 `deploy.py` 文件。
-2. 确保你已安装 `requests` 和 `pyyaml` 库，或者你可以直接通过 Docker 来运行脚本。 
-3. 使用以下命令在本地运行脚本：
+---
+
+## 🧪 示例命令
 
 ```bash
-python deploy.py --URL <PORTAINER_URL> --USERNAME <PORTAINER_USERNAME> --PASSWORD <PORTAINER_PASSWORD> --STACK <PORTAINER_STACK> --ENDPOINT <PORTAINER_ENDPOINT> --IMAGE_TAG <IMAGE_TAG>
+python deploy.py \
+  --URL "http://portainer.local:9000" \
+  --USERNAME "admin" \
+  --PASSWORD "yourpassword" \
+  --ENVIRONMENT "local" \
+  --STACK "my_stack" \
+  --SERVICE "api" \
+  --IMAGE "registry.example.com/project/api:1.0.1" \
+  --ROLLBACK
 ```
 
-### 配置参考
+---
 
-以下是一个完整的 `GitLab CI` 配置示例，说明了如何在 `GitLab CI/CD` 中使用该脚本来自动化部署。
+## 🧰 GitLab CI 集成示例
+
+以下为 `.gitlab-ci.yml` 中的 `deploy` 阶段配置：
 
 ```yaml
-stages:
-  - deploy
-
 deploy:
   stage: deploy
-  image: yuwei1228/gitlab-portainer-deploy  # 使用自定义的 Docker 镜像
+  image: yuwei1228/gitlab-portainer-deploy:latest
   script:
-    - python /app/deploy.py --URL "$PORTAINER_URL" --USERNAME "$PORTAINER_USERNAME" --PASSWORD "$PORTAINER_PASSWORD" --STACK "$PORTAINER_STACK" --ENDPOINT "$PORTAINER_ENDPOINT" --IMAGE_TAG "$IMAGE_TAG"
+    - python /app/deploy.py --URL "$PORTAINER_URL" --USERNAME "$PORTAINER_USERNAME" --PASSWORD "$PORTAINER_PASSWORD" --ENVIRONMENT "local" --STACK "yuwei_home" --SERVICE "api" --IMAGE ${API_IMAGE_NAME} --ROLLBACK
+    - python /app/deploy.py --URL "$PORTAINER_URL" --USERNAME "$PORTAINER_USERNAME" --PASSWORD "$PORTAINER_PASSWORD" --ENVIRONMENT "local" --STACK "yuwei_home" --SERVICE "ui" --IMAGE ${UI_IMAGE_NAME} --ROLLBACK
   tags:
-    - docker
+    - ruoyi
 ```
 
-## 脚本功能
+> 💡 **建议：**
+> - `API_IMAGE_NAME` 和 `UI_IMAGE_NAME` 应包含镜像 tag，例如：  
+>   `export API_IMAGE_NAME=registry.example.com/project/api:${CI_COMMIT_SHORT_SHA}`
 
-该脚本主要分为几个步骤：
+---
 
-1. **登录 Portainer**：通过 `username` 和 `password` 获取 JWT Token。
-2. **获取 Stack ID**：根据提供的 `stack_name` 获取对应的 Stack ID。
-3. **获取 Stack 文件**：下载并修改 Stack 的 YAML 文件中的镜像标签（如果需要），默认为 `latest` 标签。
-4. **更新 Stack**：提交更新后的 Stack 文件，并触发更新操作。
-5. **健康检查**：检查相关容器的健康状态，确保更新后的容器运行正常。如果超时或者容器状态不健康，脚本会抛出异常并报告失败。
+## 🛡️ 健康检查机制
 
-## 依赖
+- 工具会等待新容器启动并进入 `healthy` 状态；
+- 如果容器 `unhealthy` 或超时未进入 `healthy`，视为部署失败；
+- 启用 `--ROLLBACK` 可在失败时自动恢复至旧版本镜像。
 
-此脚本依赖以下 Python 库：
+---
 
-- `requests`：用于发送 HTTP 请求。
-- `pyyaml`：用于处理 YAML 配置文件。
+## 🧩 依赖环境
 
-你可以使用以下命令安装这些依赖：
+- Python 3.6+
+- 安装依赖项（仅本地测试时需要）：
+  ```bash
+  pip install requests pyyaml
+  ```
 
-```bash
-pip install requests pyyaml
-```
-
-### Docker 方式运行
-
-如果你不希望手动安装 Python 库，可以直接使用 Docker 来运行该脚本。以下是示例 Dockerfile 配置：
-
-```dockerfile
-# 使用官方 Python 镜像作为基础镜像
-FROM python:3.9-slim
-
-# 设置工作目录为 /app
-WORKDIR /app
-
-# 将当前目录的内容复制到容器的 /app 目录
-COPY . /app
-
-# 安装项目的依赖
-RUN pip install --no-cache-dir requests pyyaml
-
-# 设置容器的默认命令
-CMD ["python", "deploy.py"]
-```
-
-你可以通过以下命令来构建 Docker 镜像并运行容器：
-
-```bash
-docker build -t portainer-deploy .
-docker run -e URL=<PORTAINER_URL> -e USERNAME=<PORTAINER_USERNAME> -e PASSWORD=<PORTAINER_PASSWORD> -e STACK=<PORTAINER_STACK> -e ENDPOINT=<PORTAINER_ENDPOINT> portainer-deploy
-```
-
-## 错误处理
-
-- 如果在更新 Stack 或检查容器健康时发生错误，脚本会抛出异常并打印错误信息。
-- 如果所有容器未通过健康检查，脚本会在超时后报告失败。
+---
