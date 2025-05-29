@@ -112,8 +112,12 @@ class PortainerUpdater:
                     rollback_res = self.update_stack(stack_id, env_id, orig_stack_file, stack.get('Env', []))
                     if rollback_res.status_code == 200:
                         print("[INFO] 回滚成功")
+                        raise RuntimeError("部署失败，已回滚")
                     else:
                         print(f"[ERROR] 回滚失败: {rollback_res.status_code} {rollback_res.text}")
+                        raise RuntimeError("部署失败且回滚失败")
+                else:
+                    raise RuntimeError("部署失败，未启用回滚")
         else:
             print(f"[ERROR] 部署失败: {res.status_code} {res.text}")
             if rollback:
@@ -121,8 +125,12 @@ class PortainerUpdater:
                 rollback_res = self.update_stack(stack_id, env_id, orig_stack_file, stack.get('Env', []))
                 if rollback_res.status_code == 200:
                     print("[INFO] 回滚成功")
+                    raise RuntimeError("部署失败，已回滚")
                 else:
                     print(f"[ERROR] 回滚失败: {rollback_res.status_code} {rollback_res.text}")
+                    raise RuntimeError("部署失败且回滚失败")
+            else:
+                raise RuntimeError("部署失败，未启用回滚")
 
 def main():
     parser = argparse.ArgumentParser()
@@ -138,15 +146,18 @@ def main():
     args = parser.parse_args()
 
     updater = PortainerUpdater(args.URL, args.USERNAME, args.PASSWORD)
-    updater.deploy(
-        env_name=args.ENVIRONMENT,
-        stack_name=args.STACK,
-        service=args.SERVICE,
-        new_image=args.IMAGE,
-        rollback=args.ROLLBACK,
-        timeout=args.TIMEOUT
-    )
-
+    try:
+        updater.deploy(
+            env_name=args.ENVIRONMENT,
+            stack_name=args.STACK,
+            service=args.SERVICE,
+            new_image=args.IMAGE,
+            rollback=args.ROLLBACK,
+            timeout=args.TIMEOUT
+        )
+    except Exception as e:
+        print(f"[FATAL] 部署过程中发生错误: {e}")
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()
