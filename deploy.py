@@ -80,6 +80,8 @@ class PortainerUpdater:
                         return True
                     elif health == "unhealthy":
                         return False
+                    elif not health and detail.get("State", {}).get("Status") == "running":
+                        return True
             time.sleep(3)
         return False
 
